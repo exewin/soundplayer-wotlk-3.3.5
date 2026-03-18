@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: SoundPlayer
+## Notes: Addon to play wow sounds
+## Author: Exewin
+## Version: 1.0
+## SavedVariables: SoundPlayerExe, SoundPlayerDB
+
+SoundPlayer.lua
