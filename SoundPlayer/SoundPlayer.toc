@@ -2,7 +2,7 @@
 ## Title: SoundPlayer
 ## Notes: Addon to play wow sounds
 ## Author: Exewin
-## Version: 1.1
+## Version: 1.3
 ## SavedVariables: SoundPlayerExe, SoundPlayerDB
 
 SoundPlayer.lua

@@ -8,6 +8,8 @@ local dbFrame
 local listening = false
 local RefreshDatabase
 
+local maxID = 18019 -- highest sound ID in 3.3.5a, but some are missing, so we might get blank ones when randomizing
+
 if not SoundPlayerDB then
     SoundPlayerDB = {}
 end
@@ -20,12 +22,52 @@ end
 ------------------------------------------------
 ------------------------------------------------
 
+local function CleanPath(s)
+    s = s:gsub("^%s*(.-)%s*$", "%1") -- trim
+    s = s:gsub("[%c]", "")           -- control chars
+    s = s:gsub("\\\\", "\\")         -- change double backslashes to single
+    return s
+end
 
-local function PlaySoundExe(id)
-	if (tonumber(GetCVar("Sound_EnableSFX")) == 0) then
-		print ("|cffff0000SoundPlayer|r: Your sound is disabled.")
+local function ExtractPath(input)
+    local path = input:match('"(.-)"')
+    return path or input
+end
+
+local function IsValidSoundInput(str)
+    if str:find("\\") then
+        return true
+    end
+
+    local num = tonumber(str)
+    if num and num >= 0 and num <= maxID and str:match("^%d+$") then
+        return true
+    end
+
+    return false
+end
+
+local function PlaySoundExe(sound)
+
+    sound = tostring(sound)
+
+    if (tonumber(GetCVar("Sound_EnableSFX")) == 0) then
+        print("|cffff0000SoundPlayer|r: Your sound is disabled.")
+        return
+    end
+
+	if IsValidSoundInput(sound) then
+        sound = ExtractPath(sound)
+        sound = CleanPath(sound)
+        local num = tonumber(sound)
+        if num then
+            PlaySound(num)
+        else
+            PlaySoundFile(sound)
+        end
+	else
+		print("|cffff0000SoundPlayer|r: Invalid sound input.")
 	end
-	PlaySound(id)
 end
 
 local function StopAllSounds()
@@ -35,28 +77,39 @@ end
 local function TriggerListening()
     listening = not listening
     if listening then
+        if (tonumber(GetCVar("Sound_EnableSFX")) == 1) then
+            PlaySoundFile("Sound\\Creature\\OrcMaleStandardNPC\\OrcMaleStandardNPCGreeting04.wav")  
+        end
         print("|cff00ff00SoundPlayer|r: Party listening enabled")
     else
+        if (tonumber(GetCVar("Sound_EnableSFX")) == 1) then
+            PlaySoundFile("Sound\\Creature\\OrcMaleShadyNPC\\OrcMaleShadyNPCFarewell02.wav")
+        end
         print("|cff00ff00SoundPlayer|r: Party listening disabled")
     end
 end
 
 local function AddToDB(id, desc)
-    local check = tonumber(id)
-
-    if not check then
-        print("|cffff0000SoundPlayer|r: Error: ID must be a number")
-        return false
+    sound = tostring(id)
+    if IsValidSoundInput(sound) then
+    sound = ExtractPath(sound)
+    sound = CleanPath(sound)
+    local num = tonumber(sound)
+    if num then
+        table.insert(SoundPlayerDB,{
+            type = "id",
+            id = id,
+            desc = desc
+        })
+    else
+        table.insert(SoundPlayerDB,{
+            type = "path",
+            path = sound
+        })
     end
-
-    if check < 0 or check > 99999 then
-        print("|cffff0000SoundPlayer|r: Error: ID must be between 0 and 99999")
-        return false
-    end
-    table.insert(SoundPlayerDB, {
-        id = id,
-        desc = desc
-    })
+	else
+		print("|cffff0000SoundPlayer|r: Invalid sound input.")
+	end
 
     if dbFrame and dbFrame:IsShown() and RefreshDatabase then
         RefreshDatabase()
@@ -72,8 +125,16 @@ local function ToggleFrame()
     end
 end
 
+local function toggleDBFrame()
+    if dbFrame:IsShown() then
+        dbFrame:Hide()
+    else
+        dbFrame:Show()
+    end
+end
+
 local function PlayRandomSound()
-    local id = math.random(3,18019) -- highest ID is 18019, but some are missing, so we might blank ones that don't exist
+    local id = math.random(3,maxID)
     PlaySoundExe(id)
     print("|cff00ff00SoundPlayer|r: Played sound ID:", id)
 end
@@ -81,32 +142,31 @@ end
 local function ReceiveSound(event, ...)
     if event == "CHAT_MSG_ADDON" then
         local prefix, msg, channel, sender = ...
-
         if prefix ~= "SoundPlayerExe" then return end
         if not listening then return end
         if sender == UnitName("player") then return end
-
-        local id = tonumber(msg)
-
-        if id then
-            PlaySoundExe(id)
-            print("|cff00ff00SoundPlayer|r: Play Sound", id, "from", sender)
+        if not IsValidSoundInput(msg) then return end
+        msg = ExtractPath(msg)
+        PlaySoundExe(msg)
+        if (tonumber(GetCVar("Sound_EnableSFX")) == 1) then
+            print("|cff00ff00SoundPlayer|r: |cffffff00" .. msg .. "|r from " .. sender)
+        else
+            print("|cffff0000SoundPlayer|r: Received sound (" .. msg .. ") from " .. sender .. " but your sound is disabled")
         end
-
         return
     end
 
     local msg, author = ...
-
     if not listening then return end
     if author == UnitName("player") then return end
-
-    local id = tonumber(msg)
-
-    if id then
-        PlaySoundExe(id)
-        print("|cff00ff00SoundPlayer|r: Party Sound", id, "from", author)
-    end
+    if not IsValidSoundInput(msg) then return end
+    msg = ExtractPath(msg)
+    PlaySoundExe(msg)
+            if (tonumber(GetCVar("Sound_EnableSFX")) == 1) then
+            print("|cff00ff00SoundPlayer|r: |cffffff00" .. msg .. "|r from " .. author)
+        else
+            print("|cffff0000SoundPlayer|r: Received sound (" .. msg .. ") from " .. author .. " but your sound is disabled")
+        end
 end
 
 ------------------------------------------------
@@ -124,6 +184,10 @@ dbFrame:Hide()
 dbFrame:SetMovable(true)
 dbFrame:EnableMouse(true)
 dbFrame:RegisterForDrag("LeftButton")
+
+dbFrame:SetScript("OnHide", function()
+    PlaySound(680)
+end)
 
 -- resizing is buggy and fuck it for now
 
@@ -175,7 +239,7 @@ content:SetSize(1,1)
 scrollFrame:SetScrollChild(content)
 
 local function UpdateContentHeight()
-    local rowHeight = 32 -- wysokość wiersza
+    local rowHeight = 32
     local numRows = #SoundPlayerDB
     content:SetHeight(numRows * rowHeight)
 end
@@ -193,7 +257,7 @@ local function CreateRow(index)
     row:SetPoint("TOPLEFT", 0, -(index-1)*32)
 
     rows[index] = row
-
+    
     -- ID
     row.idText = row:CreateFontString(nil,"OVERLAY","GameFontNormal")
     row.idText:SetPoint("LEFT", row, "LEFT", COL_ID, 0)
@@ -278,31 +342,74 @@ RefreshDatabase = function()
         local row = rows[i]
         row:Show()
 
-        row.idText:SetText(data.id)
-        row.desc:SetText(data.desc or "")
+        -- TYPE CHECK
+        if data.type == "path" then
 
-        -- PLAY
-        row.play:SetScript("OnClick", function()
-            PlaySoundExe(data.id)
-        end)
+            -- PATH RECORD
+            local filename = data.path:match("[^\\]+$")
+            row.idText:SetText(filename)
+            row.idText:SetWidth(240)
+            row.idText:SetFont("Fonts\\FRIZQT__.TTF", 10)
+            row.idText:SetJustifyH("LEFT")
+            row.idText:SetNonSpaceWrap(false)
+            row.desc:Hide()
 
-        -- EDIT
-        row.desc:SetScript("OnTextChanged", function(self)
-            data.desc = self:GetText()
-        end)
+            -- PLAY PATH
+            row.play:SetScript("OnClick", function()
+                PlaySoundFile(data.path)
+            end)
+
+            -- CLICK PATH
+            row.idClick:SetScript("OnClick", function()
+                editBox:SetText(data.path or "")
+            end)
+
+        else
+
+            -- ID RECORD
+            row.idText:SetText(data.id)
+
+            row.desc:Show()
+            row.desc:SetText(data.desc or "")
+
+            -- PLAY ID
+            row.play:SetScript("OnClick", function()
+                PlaySoundExe(data.id)
+            end)
+
+            -- EDIT DESC
+            row.desc:SetScript("OnTextChanged", function(self)
+                data.desc = self:GetText()
+            end)
+
+            -- CLICK ID
+            row.idClick:SetScript("OnClick", function()
+                editBox:SetText(row.idText:GetText())
+            end)
+
+        end
 
         -- DELETE
         row.delete:SetScript("OnClick", function()
-            table.remove(SoundPlayerDB, i)
-            print("|cff00ff00SoundPlayer|r: Deleted sound ID", data.id, data.desc ~= "" and ("("..data.desc..")") or "")
-            RefreshDatabase()
-        end)
+
+    table.remove(SoundPlayerDB, i)
+
+    if data.type == "path" then
+        print("|cff00ff00SoundPlayer|r: Deleted path", data.path)
+    else
+        print("|cff00ff00SoundPlayer|r: Deleted sound ID", data.id, data.desc ~= "" and ("("..data.desc..")") or "")
+    end
+
+    RefreshDatabase()
+
+end)
 
     end
 
 end
 
 dbFrame:SetScript("OnShow", function()
+    PlaySound(681)  
     RefreshDatabase()
 end)
 
@@ -322,6 +429,13 @@ frame:SetMovable(true)
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
 
+frame:SetScript("OnHide", function()
+    PlaySound(680)
+end)
+
+frame:SetScript("OnShow", function()
+    PlaySound(681)
+end)
 
 frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal") 
 frame.title:SetPoint("TOP", frame, "TOP", 0, -10) 
@@ -336,9 +450,10 @@ helpBtn:SetPoint("TOPLEFT", frame, "TOPLEFT", 5, -5)
 -- tooltip
 helpBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Sound Player v1.1")
-    GameTooltip:AddLine("Play sounds by ID", 0.7, 0.7, 0.7)
-    GameTooltip:AddLine("made by exewin in 2026", 0.7, 0.7, 0.7)
+    GameTooltip:SetText("Sound Player v1.3")
+    GameTooltip:AddLine("Play sounds by ID or Path", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("Made by Exewin in 2026", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("Testing: Gedrikh", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
 
@@ -489,8 +604,10 @@ listenButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
     GameTooltip:SetText("Listen to sounds")
     GameTooltip:AddLine("- doesn't work with random sounds", 0.7, 0.7, 0.7)
-    GameTooltip:AddLine("- works with party messages", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("- doesn't work with sounds from DB", 0.7, 0.7, 0.7)
     GameTooltip:AddLine("- works with PLAY button", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("- works with /sp command", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("- works with party messages", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
 
@@ -539,11 +656,7 @@ icon:SetTexture(GetItemIcon(itemID))
 dbButton:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
 
 dbButton:SetScript("OnClick", function()
-	if dbFrame:IsShown() then
-        dbFrame:Hide()
-    else
-        dbFrame:Show()
-    end
+	toggleDBFrame()
 end)
 
 
@@ -600,11 +713,7 @@ SlashCmdList["SOUNDPLAYER"] = function(msg)
     -- /sp db - toggle db window
     if cmd == "db" and (rest == nil or rest == "") then
         if dbFrame then
-            if dbFrame:IsShown() then
-                dbFrame:Hide()
-            else
-                dbFrame:Show()
-            end
+            toggleDBFrame()
         end
         return
     end
@@ -663,11 +772,8 @@ SlashCmdList["SOUNDPLAYER"] = function(msg)
         return
     end
 
-    -- play specific sound
-    local id = tonumber(msg)
-    if id then
-        PlaySoundExe(id)
-    else
+    -- help
+    if msg == "help" then
         print("|cff00ff00SoundPlayer|r Commands:")
         print("/sp - toggle SoundPlayer window")
         print("/sp <id> - play sound")
@@ -678,6 +784,13 @@ SlashCmdList["SOUNDPLAYER"] = function(msg)
         print("/sp db - toggle database window")
         print("/sp db <index> - play sound from database")
         print("/sp del <index> - delete sound from database")
+        return
+    end
+
+    -- play specific sound
+    if msg then
+        SendAddonMessage("SoundPlayerExe", msg, "PARTY", UnitName("player"))
+        PlaySoundExe(msg)
     end
 end
 
