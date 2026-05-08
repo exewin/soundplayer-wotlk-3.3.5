@@ -9,19 +9,20 @@ Simple addon for **playing WoW sounds by ID**, managing your own sound database,
 ## ✨ Features
 
 * ▶️ Play sounds by ID
+* ▶️ Play sounds by PATH (NEW in 1.3)
 * 🎲 Random sound generator
 * 📡 Listen to party chat (auto-play sound IDs)
 * 💾 Personal sound database (SavedVariables)
 * 🧾 Add / edit / delete entries
 * 🖱️ Minimap icon with drag & position saving
 * 🪟 Custom UI with scrollable list
-* 📤 Addon message support (send sounds to other players)
+* 📤 Addon message support (send sounds to other players with addon)
 
 ---
 
 ## 📦 Installation
 
-1. Download or clone this repository
+1. Download: https://github.com/exewin/soundplayer-wotlk-3.3.5/releases/download/v1.3/SoundPlayer.zip
 2. Place SoundPlayer folder into:
 
 ```
@@ -36,7 +37,7 @@ World of Warcraft/Interface/AddOns/
 
 ---
 
-## ⚙️ Commands
+## ⚙️ Commands (optional)
 
 ### General
 
@@ -70,23 +71,6 @@ When enabled:
 /sp db <index>     → Play sound from database
 /sp add <id> <desc> → Add new sound (description optional)
 /sp del <index>    → Delete entry from database
-```
-
----
-
-## 🧠 How Database Works
-
-Each entry:
-
-```
-{ id = 12345, desc = "Explosion" }
-```
-
-* Index = position in table (`SoundPlayerDB[index]`)
-* Stored in SavedVariables:
-
-```
-## SavedVariables: SoundPlayerDB
 ```
 
 ---
